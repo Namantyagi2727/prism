@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -94,3 +95,21 @@ class RequestLog(Base):
     )
 
     api_key: Mapped["ApiKey"] = relationship("ApiKey", back_populates="request_logs")
+
+
+class PromptCache(Base):
+    __tablename__ = "prompt_cache"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    virtual_model: Mapped[str] = mapped_column(String, nullable=False)
+    prompt_text: Mapped[str] = mapped_column(String, nullable=False)
+    prompt_embedding: Mapped[list[float]] = mapped_column(Vector(768), nullable=False)
+    response_text: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
