@@ -6,15 +6,13 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from prism.config import settings
 from prism.core.auth import validate_api_key
 from prism.core.cost import calculate_cost
+from prism.core.router import PROVIDERS, route
 from prism.db.models import ApiKey, ModelRoute, RequestLog
 from prism.db.session import get_db
-from prism.providers.ollama_provider import OllamaProvider
 
 router = APIRouter(tags=["gateway"])
-_ollama = OllamaProvider()
 
 
 class Message(BaseModel):
@@ -36,32 +34,27 @@ async def chat_completions(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, object]:
     if body.stream:
-        raise HTTPException(
-            status_code=400, detail="Streaming not supported in Phase 1"
-        )
+        raise HTTPException(status_code=400, detail="Streaming not supported yet")
 
     start = time.perf_counter()
 
-    result = await db.execute(
+    rows = await db.execute(
         select(ModelRoute)
         .where(ModelRoute.virtual_model == body.model)
         .order_by(ModelRoute.priority)
-        .limit(1)
     )
-    route = result.scalar_one_or_none()
+    routes = [(r.provider, r.real_model, r.priority) for r in rows.scalars().all()]
 
-    provider_name = route.provider if route else "ollama"
-    real_model = route.real_model if route else settings.ollama_default_model
-
-    if provider_name != "ollama":
+    if not routes:
         raise HTTPException(
-            status_code=503,
-            detail=f"Provider {provider_name} not available in Phase 1",
+            status_code=404,
+            detail=f"No routes configured for model '{body.model}'",
         )
 
-    chat_result = await _ollama.chat(
+    chat_result, provider_name, real_model, fallback_triggered = await route(
+        routes=routes,
+        providers=PROVIDERS,
         messages=[m.model_dump() for m in body.messages],
-        model=real_model,
         temperature=body.temperature,
     )
 
@@ -77,6 +70,7 @@ async def chat_completions(
         api_key_id=api_key.id,
         virtual_model=body.model,
         provider_used=provider_name,
+        fallback_triggered=fallback_triggered,
         prompt_tokens=chat_result.prompt_tokens,
         completion_tokens=chat_result.completion_tokens,
         cost_usd=cost,
@@ -91,7 +85,7 @@ async def chat_completions(
         "prism_metadata": {
             "provider_used": provider_name,
             "cache_hit": False,
-            "fallback_triggered": False,
+            "fallback_triggered": fallback_triggered,
             "cost_usd": float(cost),
             "latency_ms": latency_ms,
         },
