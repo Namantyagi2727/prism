@@ -1,3 +1,4 @@
+import json
 import time
 from decimal import Decimal
 
@@ -7,7 +8,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from prism.core.auth import validate_api_key
+from prism.core.cache import exact_cache_key, get_exact, set_exact
 from prism.core.cost import calculate_cost
+from prism.core.guardrails import scan_prompt
 from prism.core.router import PROVIDERS, route
 from prism.db.models import ApiKey, ModelRoute, RequestLog
 from prism.db.session import get_db
@@ -36,7 +39,53 @@ async def chat_completions(
     if body.stream:
         raise HTTPException(status_code=400, detail="Streaming not supported yet")
 
+    messages = [m.model_dump() for m in body.messages]
+    full_text = " ".join(m.get("content", "") for m in messages)
+
+    guardrail = scan_prompt(full_text)
+    if guardrail.flagged:
+        log = RequestLog(
+            api_key_id=api_key.id,
+            virtual_model=body.model,
+            provider_used="blocked",
+            status_code=400,
+            guardrail_flag=guardrail.reason,
+        )
+        db.add(log)
+        await db.commit()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Request blocked by guardrail: {guardrail.reason}",
+        )
+
     start = time.perf_counter()
+    cache_key = exact_cache_key(body.model, messages, body.temperature)
+    cached = await get_exact(cache_key)
+
+    if cached is not None:
+        latency_ms = int((time.perf_counter() - start) * 1000)
+        cached_data: dict[str, object] = json.loads(cached)
+        log = RequestLog(
+            api_key_id=api_key.id,
+            virtual_model=body.model,
+            provider_used="cache",
+            cache_hit=True,
+            cost_usd=Decimal("0"),
+            latency_ms=latency_ms,
+            status_code=200,
+        )
+        db.add(log)
+        await db.commit()
+        return {
+            **cached_data,
+            "prism_metadata": {
+                "provider_used": "cache",
+                "cache_hit": True,
+                "fallback_triggered": False,
+                "cost_usd": 0.0,
+                "latency_ms": latency_ms,
+            },
+        }
 
     rows = await db.execute(
         select(ModelRoute)
@@ -54,7 +103,7 @@ async def chat_completions(
     chat_result, provider_name, real_model, fallback_triggered = await route(
         routes=routes,
         providers=PROVIDERS,
-        messages=[m.model_dump() for m in body.messages],
+        messages=messages,
         temperature=body.temperature,
     )
 
@@ -66,11 +115,14 @@ async def chat_completions(
         chat_result.completion_tokens,
     )
 
+    await set_exact(cache_key, json.dumps(chat_result.raw))
+
     log = RequestLog(
         api_key_id=api_key.id,
         virtual_model=body.model,
         provider_used=provider_name,
         fallback_triggered=fallback_triggered,
+        cache_hit=False,
         prompt_tokens=chat_result.prompt_tokens,
         completion_tokens=chat_result.completion_tokens,
         cost_usd=cost,
