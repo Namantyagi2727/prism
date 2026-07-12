@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     ollama_timeout_s: float = 60.0
 
     admin_secret: str = "change-me-in-production"
+    otel_endpoint: str = ""
 
     @property
     def database_url(self) -> str:
