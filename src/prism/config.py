@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379"
     log_level: str = "INFO"
 
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_default_model: str = "llama3.2:3b"
+    ollama_timeout_s: float = 60.0
+
+    admin_secret: str = "change-me-in-production"
+
     @property
     def database_url(self) -> str:
         return (
