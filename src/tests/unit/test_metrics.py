@@ -4,17 +4,14 @@ from prometheus_client import REGISTRY
 def test_all_metrics_registered() -> None:
     from prism.observability import metrics  # noqa: F401
 
-    # prometheus_client >= 0.12 strips the _total suffix from the metric-family
-    # name (m.name) to follow OpenMetrics conventions; the full names including
-    # _total are available in REGISTRY._names_to_collectors which tracks every
-    # name a collector claims.
-    names = set(REGISTRY._names_to_collectors.keys())
-    assert "prism_requests_total" in names
+    # prometheus_client >= 0.12 strips _total from Counter family names in collect()
+    names = {m.name for m in REGISTRY.collect()}
+    assert "prism_requests" in names
     assert "prism_request_latency_seconds" in names
-    assert "prism_cost_usd_total" in names
-    assert "prism_cache_hits_total" in names
-    assert "prism_cache_misses_total" in names
-    assert "prism_guardrail_blocks_total" in names
+    assert "prism_cost_usd" in names
+    assert "prism_cache_hits" in names
+    assert "prism_cache_misses" in names
+    assert "prism_guardrail_blocks" in names
     assert "prism_circuit_breaker_open" in names
 
 
