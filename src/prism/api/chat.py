@@ -14,6 +14,14 @@ from prism.core.guardrails import scan_prompt
 from prism.core.router import PROVIDERS, route
 from prism.db.models import ApiKey, ModelRoute, RequestLog
 from prism.db.session import get_db
+from prism.observability.metrics import (
+    cache_hits_total,
+    cache_misses_total,
+    cost_usd_total,
+    guardrail_blocks_total,
+    request_counter,
+    request_latency,
+)
 
 router = APIRouter(tags=["gateway"])
 
@@ -30,6 +38,16 @@ class ChatRequest(BaseModel):
     stream: bool = False
 
 
+def _guardrail_label(reason: str | None) -> str:
+    if reason is None:
+        return "unknown"
+    if reason.startswith("PII"):
+        return "pii_detected"
+    if "injection" in reason.lower():
+        return "prompt_injection"
+    return "unknown"
+
+
 @router.post("/v1/chat/completions")
 async def chat_completions(
     body: ChatRequest,
@@ -44,6 +62,10 @@ async def chat_completions(
 
     guardrail = scan_prompt(full_text)
     if guardrail.flagged:
+        guardrail_blocks_total.labels(reason=_guardrail_label(guardrail.reason)).inc()
+        request_counter.labels(
+            virtual_model=body.model, provider_used="blocked", status_code="400"
+        ).inc()
         log = RequestLog(
             api_key_id=api_key.id,
             virtual_model=body.model,
@@ -65,6 +87,13 @@ async def chat_completions(
     if cached is not None:
         latency_ms = int((time.perf_counter() - start) * 1000)
         cached_data: dict[str, object] = json.loads(cached)
+        cache_hits_total.labels(virtual_model=body.model).inc()
+        request_counter.labels(
+            virtual_model=body.model, provider_used="cache", status_code="200"
+        ).inc()
+        request_latency.labels(virtual_model=body.model, provider_used="cache").observe(
+            latency_ms / 1000
+        )
         log = RequestLog(
             api_key_id=api_key.id,
             virtual_model=body.model,
@@ -113,6 +142,17 @@ async def chat_completions(
         real_model,
         chat_result.prompt_tokens,
         chat_result.completion_tokens,
+    )
+
+    cache_misses_total.labels(virtual_model=body.model).inc()
+    request_counter.labels(
+        virtual_model=body.model, provider_used=provider_name, status_code="200"
+    ).inc()
+    request_latency.labels(
+        virtual_model=body.model, provider_used=provider_name
+    ).observe(latency_ms / 1000)
+    cost_usd_total.labels(virtual_model=body.model, provider_used=provider_name).inc(
+        float(cost)
     )
 
     await set_exact(cache_key, json.dumps(chat_result.raw))

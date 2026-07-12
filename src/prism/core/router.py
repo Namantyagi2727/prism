@@ -1,6 +1,7 @@
 from fastapi import HTTPException
 
 from prism.core.circuit_breaker import CircuitBreaker, circuit_breaker
+from prism.observability.metrics import circuit_breaker_open
 from prism.providers.anthropic_provider import AnthropicProvider
 from prism.providers.base import BaseProvider, ChatResult
 from prism.providers.ollama_provider import OllamaProvider
@@ -30,7 +31,9 @@ async def route(
     last_error: Exception | None = None
 
     for provider_name, real_model, _ in routes:
-        if cb.is_open(provider_name):
+        is_open = cb.is_open(provider_name)
+        circuit_breaker_open.labels(provider=provider_name).set(1.0 if is_open else 0.0)
+        if is_open:
             fallback_triggered = True
             continue
 
@@ -46,9 +49,13 @@ async def route(
                 temperature=temperature,
             )
             cb.record_success(provider_name)
+            circuit_breaker_open.labels(provider=provider_name).set(0.0)
             return result, provider_name, real_model, fallback_triggered
         except Exception as exc:
             cb.record_failure(provider_name)
+            circuit_breaker_open.labels(provider=provider_name).set(
+                1.0 if cb.is_open(provider_name) else 0.0
+            )
             last_error = exc
             fallback_triggered = True
 
