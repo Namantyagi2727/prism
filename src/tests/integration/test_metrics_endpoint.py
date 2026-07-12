@@ -2,8 +2,9 @@ import uuid
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from prism.main import app
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from prism.main import app
 
 ADMIN_HEADERS = {"Authorization": "Bearer change-me-in-production"}
 
