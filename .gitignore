@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+dist/
+.eggs/
+
+# Environment — never commit real values
+.env
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Type checker
+.mypy_cache/
+
+# Linter
+.ruff_cache/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Docker
+*.log
