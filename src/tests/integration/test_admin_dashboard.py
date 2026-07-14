@@ -88,3 +88,40 @@ async def test_dashboard_shows_seeded_team_and_guardrail_data() -> None:
     assert 'id="panel-cost"' in response.text
     assert 'id="panel-performance"' in response.text
     assert 'id="panel-safety"' in response.text
+
+
+@pytest.mark.integration
+async def test_dashboard_includes_tab_and_chart_script() -> None:
+    # Seed our own data so the chart <svg> elements are guaranteed to render
+    # regardless of what other tests have (or haven't) inserted in the same
+    # 24h window — the template swaps to an empty-state div when a series
+    # has no rows, so this can't rely on shared session state.
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        team = await client.post(
+            "/admin/teams",
+            json={"name": "dashboard-script-test"},
+            headers={"Authorization": f"Bearer {ADMIN_SECRET}"},
+        )
+        key_resp = await client.post(
+            "/admin/keys",
+            json={"team_id": team.json()["id"]},
+            headers={"Authorization": f"Bearer {ADMIN_SECRET}"},
+        )
+        api_key = key_resp.json()["key"]
+
+        await client.post(
+            "/v1/chat/completions",
+            json={"model": "fast", "messages": [{"role": "user", "content": "hi"}]},
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+
+        response = await client.get(
+            "/admin/dashboard", headers=_basic_auth_header(ADMIN_SECRET)
+        )
+    # Request Volume (line) and Provider Mix (bar) both depend only on
+    # overview data, which the chat completion above guarantees is non-empty.
+    assert 'data-chart="line"' in response.text
+    assert 'data-chart="bar"' in response.text
+    assert "activateTab" in response.text

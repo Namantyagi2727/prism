@@ -233,5 +233,147 @@
   <div class="chart-tooltip" id="chart-tooltip"></div>
 
   <script id="dashboard-data" type="application/json">{{ data_json | safe }}</script>
+  <script>
+    (function () {
+      "use strict";
+
+      var data = JSON.parse(document.getElementById("dashboard-data").textContent);
+
+      function getPath(obj, path) {
+        return path.split(".").reduce(function (acc, key) {
+          return acc ? acc[key] : undefined;
+        }, obj);
+      }
+
+      var tabs = Array.prototype.slice.call(document.querySelectorAll(".tab"));
+
+      function activateTab(target) {
+        tabs.forEach(function (tab) {
+          var active = tab.dataset.target === target;
+          tab.setAttribute("aria-selected", active ? "true" : "false");
+          tab.tabIndex = active ? 0 : -1;
+        });
+        document.querySelectorAll(".panel").forEach(function (panel) {
+          panel.dataset.active = panel.id === "panel-" + target ? "true" : "false";
+        });
+      }
+
+      tabs.forEach(function (tab) {
+        tab.addEventListener("click", function () {
+          activateTab(tab.dataset.target);
+        });
+        tab.addEventListener("keydown", function (evt) {
+          var idx = tabs.indexOf(tab);
+          if (evt.key === "ArrowRight") {
+            evt.preventDefault();
+            var next = tabs[(idx + 1) % tabs.length];
+            next.focus();
+            activateTab(next.dataset.target);
+          } else if (evt.key === "ArrowLeft") {
+            evt.preventDefault();
+            var prev = tabs[(idx - 1 + tabs.length) % tabs.length];
+            prev.focus();
+            activateTab(prev.dataset.target);
+          }
+        });
+      });
+
+      var tooltip = document.getElementById("chart-tooltip");
+
+      function showTooltip(evt, text) {
+        tooltip.textContent = text;
+        tooltip.style.display = "block";
+        tooltip.style.left = evt.pageX + 12 + "px";
+        tooltip.style.top = evt.pageY + 12 + "px";
+      }
+
+      function hideTooltip() {
+        tooltip.style.display = "none";
+      }
+
+      var SVG_NS = "http://www.w3.org/2000/svg";
+
+      function renderLineChart(svg, points, xKey, yKey) {
+        var width = svg.clientWidth || 600;
+        var height = 160;
+        var padding = 20;
+        svg.setAttribute("viewBox", "0 0 " + width + " " + height);
+
+        var values = points.map(function (p) { return p[yKey]; });
+        var maxY = Math.max.apply(null, values.concat([0.0001]));
+        var stepX = points.length > 1 ? (width - padding * 2) / (points.length - 1) : 0;
+
+        var coords = points.map(function (p, i) {
+          var x = padding + i * stepX;
+          var y = height - padding - (p[yKey] / maxY) * (height - padding * 2);
+          return { x: x, y: y, label: p[xKey], value: p[yKey] };
+        });
+
+        var pathD = coords
+          .map(function (c, i) { return (i === 0 ? "M" : "L") + c.x + "," + c.y; })
+          .join(" ");
+
+        var path = document.createElementNS(SVG_NS, "path");
+        path.setAttribute("d", pathD);
+        path.setAttribute("class", "chart-line");
+        svg.appendChild(path);
+
+        coords.forEach(function (c) {
+          var circle = document.createElementNS(SVG_NS, "circle");
+          circle.setAttribute("cx", String(c.x));
+          circle.setAttribute("cy", String(c.y));
+          circle.setAttribute("r", "3");
+          circle.setAttribute("class", "chart-point");
+          circle.addEventListener("mousemove", function (evt) {
+            showTooltip(evt, c.label + ": " + c.value);
+          });
+          circle.addEventListener("mouseleave", hideTooltip);
+          svg.appendChild(circle);
+        });
+      }
+
+      function renderBarChart(svg, points, xKey, yKey) {
+        var width = svg.clientWidth || 600;
+        var height = 160;
+        var padding = 20;
+        svg.setAttribute("viewBox", "0 0 " + width + " " + height);
+
+        var values = points.map(function (p) { return p[yKey]; });
+        var maxY = Math.max.apply(null, values.concat([0.0001]));
+        var barWidth = (width - padding * 2) / points.length;
+
+        points.forEach(function (p, i) {
+          var barHeight = (p[yKey] / maxY) * (height - padding * 2);
+          var x = padding + i * barWidth;
+          var y = height - padding - barHeight;
+          var rect = document.createElementNS(SVG_NS, "rect");
+          rect.setAttribute("x", String(x + barWidth * 0.1));
+          rect.setAttribute("y", String(y));
+          rect.setAttribute("width", String(barWidth * 0.8));
+          rect.setAttribute("height", String(barHeight));
+          rect.setAttribute("class", "chart-bar");
+          rect.addEventListener("mousemove", function (evt) {
+            showTooltip(evt, p[xKey] + ": " + p[yKey]);
+          });
+          rect.addEventListener("mouseleave", hideTooltip);
+          svg.appendChild(rect);
+        });
+      }
+
+      document.querySelectorAll("svg[data-chart]").forEach(function (svg) {
+        var series = getPath(data, svg.dataset.series) || [];
+        if (!series.length) return;
+        var xKey = svg.dataset.x;
+        var yKey = svg.dataset.y;
+        if (svg.dataset.chart === "line") {
+          renderLineChart(svg, series, xKey, yKey);
+        } else {
+          renderBarChart(svg, series, xKey, yKey);
+        }
+      });
+
+      window.activateTab = activateTab;
+    })();
+  </script>
 </body>
 </html>
