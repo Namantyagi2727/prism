@@ -114,3 +114,18 @@ class GatewayOverheadUser(PrismUser):
             name="/v1/chat/completions [mock-fast guardrail-block]",
             expect_status=400,
         )
+
+
+class RealInferenceUser(PrismUser):
+    weight = 1
+    wait_time = between(2, 5)
+
+    @task
+    def real_chat(self) -> None:
+        prompt = random.choice(SAFE_PROMPTS)
+        self._chat(
+            prompt,
+            model="fast",
+            temperature=random.random(),
+            name="/v1/chat/completions [fast real-inference]",
+        )
