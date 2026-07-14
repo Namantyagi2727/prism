@@ -20,6 +20,7 @@ dependencies = [
     "opentelemetry-instrumentation-fastapi>=0.41b0",
     "opentelemetry-exporter-otlp-proto-http>=1.20.0",
     "prometheus-client>=0.19.0",
+    "en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
 ]
 
 [project.optional-dependencies]
@@ -29,6 +30,7 @@ dev = [
     "ruff>=0.4.9",
     "mypy>=1.10.0",
     "pre-commit>=3.7.0",
+    "testcontainers[postgres,redis]>=4.7.2",
 ]
 
 [build-system]
@@ -37,6 +39,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/prism"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.ruff]
 line-length = 88
@@ -62,4 +67,7 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 asyncio_default_test_loop_scope = "session"
 testpaths = ["src/tests"]
-markers = ["integration: requires docker-compose services running (postgres + redis)"]
+markers = [
+    "integration: spins up postgres + redis via testcontainers",
+    "requires_ollama: requires a live Ollama server with llama3.2:3b pulled",
+]

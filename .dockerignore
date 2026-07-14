@@ -1,0 +1,13 @@
+.venv/
+.git/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.env
+deploy/grafana/
+deploy/prometheus/
+LLM_Gateway_Project_Guide.md

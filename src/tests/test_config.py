@@ -1,11 +1,15 @@
-from prism.config import settings
+from prism.config import Settings, settings
 
 
 def test_postgres_defaults() -> None:
-    assert settings.postgres_host == "localhost"
-    assert settings.postgres_port == 5432
-    assert settings.postgres_user == "prism"
-    assert settings.postgres_db == "prism"
+    # Field defaults, not the live singleton — the singleton reflects
+    # whatever POSTGRES_* env vars the running process was started with
+    # (e.g. testcontainers-assigned ports during the test session).
+    defaults = Settings.model_fields
+    assert defaults["postgres_host"].default == "localhost"
+    assert defaults["postgres_port"].default == 5432
+    assert defaults["postgres_user"].default == "prism"
+    assert defaults["postgres_db"].default == "prism"
 
 
 def test_database_url_format() -> None:
@@ -22,4 +26,4 @@ def test_sqlalchemy_url_format() -> None:
 
 
 def test_redis_url_default() -> None:
-    assert settings.redis_url == "redis://localhost:6379"
+    assert Settings.model_fields["redis_url"].default == "redis://localhost:6379"

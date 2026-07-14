@@ -1,9 +1,10 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
-from prism.db.models import RequestLog
-from prism.main import app
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from prism.db.models import RequestLog
+from prism.main import app
 
 ADMIN_HEADERS = {"Authorization": "Bearer change-me-in-production"}
 
@@ -26,10 +27,11 @@ async def api_key(db: AsyncSession) -> str:
 
 
 @pytest.mark.integration
+@pytest.mark.requires_ollama
 async def test_chat_completions_returns_openai_shape(
     api_key: str, db: AsyncSession
 ) -> None:
-    # Requires: docker-compose up -d postgres redis  AND  ollama serve
+    # Requires: ollama serve (with llama3.2:3b pulled)
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
@@ -58,6 +60,7 @@ async def test_chat_completions_returns_openai_shape(
 
 
 @pytest.mark.integration
+@pytest.mark.requires_ollama
 async def test_chat_logs_request(api_key: str, db: AsyncSession) -> None:
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"

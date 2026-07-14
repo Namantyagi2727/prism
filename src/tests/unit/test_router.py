@@ -1,4 +1,5 @@
 import pytest
+
 from prism.core.circuit_breaker import CircuitBreaker
 from prism.core.router import route
 from prism.providers.base import BaseProvider, ChatResult
