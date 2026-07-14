@@ -48,8 +48,9 @@ def pytest_configure(config: pytest.Config) -> None:
         f"redis://{_redis.get_container_host_ip()}:{_redis.get_exposed_port(6379)}"
     )
 
-    from alembic import command
     from alembic.config import Config
+
+    from alembic import command
 
     alembic_cfg = Config(str(REPO_ROOT / "alembic.ini"))
     alembic_cfg.set_main_option("script_location", str(REPO_ROOT / "alembic"))

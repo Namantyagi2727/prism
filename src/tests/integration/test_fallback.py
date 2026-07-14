@@ -72,8 +72,29 @@ async def test_fallback_when_ollama_fails(
 
 @pytest.mark.integration
 async def test_normal_request_not_flagged_as_fallback(
-    api_key: str, db: AsyncSession
+    api_key: str, db: AsyncSession, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Primary provider succeeds; expect no fallback. Mocked rather than
+    hitting a real Ollama server, matching test_fallback_when_ollama_fails'
+    mocked failure case — this test exercises router logic, not inference."""
+    from prism.providers.base import ChatResult
+    from prism.providers.ollama_provider import OllamaProvider
+
+    async def _succeed(
+        self: OllamaProvider,
+        messages: list[dict[str, str]],
+        model: str,
+        **kwargs: object,
+    ) -> ChatResult:
+        return ChatResult(
+            content="hi",
+            prompt_tokens=5,
+            completion_tokens=1,
+            raw={},
+        )
+
+    monkeypatch.setattr(OllamaProvider, "chat", _succeed)
+
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
