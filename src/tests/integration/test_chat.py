@@ -95,3 +95,26 @@ async def test_chat_rejects_invalid_key() -> None:
             headers={"Authorization": "Bearer prism_invalid_key"},
         )
     assert response.status_code == 401
+
+
+@pytest.mark.integration
+async def test_mock_fast_routes_to_openai_mock_only(api_key: str) -> None:
+    """mock-fast exists for load testing: isolates gateway overhead from
+    real Ollama inference latency by routing only to the deterministic
+    openai mock, never touching a real provider."""
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/v1/chat/completions",
+            json={
+                "model": "mock-fast",
+                "messages": [{"role": "user", "content": "Say hi"}],
+            },
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["prism_metadata"]["provider_used"] == "openai"
+    assert data["prism_metadata"]["fallback_triggered"] is False
