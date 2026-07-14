@@ -13,6 +13,7 @@ dist/
 .pytest_cache/
 .coverage
 htmlcov/
+src/tests/load/reports/
 
 # Type checker
 .mypy_cache/
