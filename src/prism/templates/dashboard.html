@@ -2,9 +2,236 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Prism — Admin Dashboard</title>
+  <style>
+    :root {
+      --bg: #0B0E14;
+      --panel: #11151C;
+      --border: #232838;
+      --text: #E6E9EF;
+      --text-muted: #8890A0;
+      --accent: #5B8DEF;
+      --danger: #E5484D;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+      --font-mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      padding: 2rem;
+      line-height: 1.5;
+    }
+    header h1 { font-size: 1.25rem; font-weight: 600; margin: 0 0 0.25rem; }
+    header p { color: var(--text-muted); margin: 0 0 2rem; font-size: 0.875rem; }
+    .tabs {
+      display: flex;
+      gap: 0.5rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 2rem;
+    }
+    .tab {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-family: var(--font-sans);
+      font-size: 0.875rem;
+      padding: 0.75rem 1rem;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+    .tab:hover { color: var(--text); }
+    .tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+    .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .panel { display: none; }
+    .panel[data-active="true"] { display: block; }
+    @media (prefers-reduced-motion: no-preference) {
+      .panel[data-active="true"] { animation: fade-in 0.15s ease-out; }
+    }
+    @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+    .tiles {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin-bottom: 2rem;
+    }
+    .tile { background: var(--panel); padding: 1.25rem; }
+    .tile .label {
+      color: var(--text-muted);
+      font-size: 0.6875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+    .tile .value { font-family: var(--font-mono); font-size: 1.5rem; }
+    .tile .value.danger { color: var(--danger); }
+    section.block { border-top: 1px solid var(--border); padding-top: 1.5rem; margin-bottom: 2rem; }
+    section.block h2 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin: 0 0 1rem;
+      font-weight: 600;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    th {
+      text-align: left;
+      color: var(--text-muted);
+      font-weight: 500;
+      font-size: 0.6875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); font-family: var(--font-mono); }
+    td.text { font-family: var(--font-sans); }
+    .empty-state {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      padding: 1.5rem;
+      text-align: center;
+      border: 1px dashed var(--border);
+    }
+    .chart { width: 100%; height: 160px; overflow: visible; }
+    .chart-point { fill: var(--accent); cursor: pointer; }
+    .chart-bar { fill: var(--accent); cursor: pointer; }
+    .chart-line { fill: none; stroke: var(--accent); stroke-width: 2; }
+    .chart-tooltip {
+      position: absolute;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 0.375rem 0.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      pointer-events: none;
+      display: none;
+      border-radius: 2px;
+    }
+  </style>
 </head>
 <body>
+  <header>
+    <h1>Prism — Admin Dashboard</h1>
+    <p>Last 24 hours</p>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab-overview" aria-controls="panel-overview" aria-selected="true" tabindex="0" data-target="overview">Overview</button>
+    <button class="tab" role="tab" id="tab-cost" aria-controls="panel-cost" aria-selected="false" tabindex="-1" data-target="cost">Cost &amp; Teams</button>
+    <button class="tab" role="tab" id="tab-performance" aria-controls="panel-performance" aria-selected="false" tabindex="-1" data-target="performance">Performance</button>
+    <button class="tab" role="tab" id="tab-safety" aria-controls="panel-safety" aria-selected="false" tabindex="-1" data-target="safety">Safety</button>
+  </div>
+
+  <section class="panel" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" data-active="true">
+    <div class="tiles">
+      <div class="tile"><div class="label">Total Requests</div><div class="value">{{ data.overview.total_requests }}</div></div>
+      <div class="tile"><div class="label">Total Cost</div><div class="value">${{ "%.4f"|format(data.overview.total_cost_usd) }}</div></div>
+      <div class="tile"><div class="label">Cache Hit Rate</div><div class="value">{{ "%.1f"|format(data.overview.cache_hit_rate * 100) }}%</div></div>
+      <div class="tile"><div class="label">Error Rate</div><div class="value {{ 'danger' if data.overview.error_rate > 0 else '' }}">{{ "%.1f"|format(data.overview.error_rate * 100) }}%</div></div>
+    </div>
+    <section class="block">
+      <h2>Request Volume</h2>
+      {% if data.overview.hourly_volume %}
+      <svg class="chart" data-chart="line" data-series="overview.hourly_volume" data-x="hour" data-y="count"></svg>
+      {% else %}
+      <div class="empty-state">No requests in the last 24 hours yet.</div>
+      {% endif %}
+    </section>
+    <section class="block">
+      <h2>Provider Mix</h2>
+      {% if data.overview.provider_mix %}
+      <svg class="chart" data-chart="bar" data-series="overview.provider_mix" data-x="provider" data-y="count"></svg>
+      {% else %}
+      <div class="empty-state">No requests in the last 24 hours yet.</div>
+      {% endif %}
+    </section>
+  </section>
+
+  <section class="panel" id="panel-cost" role="tabpanel" aria-labelledby="tab-cost" data-active="false">
+    <section class="block">
+      <h2>Cost by Team</h2>
+      {% if data.cost_by_team %}
+      <svg class="chart" data-chart="bar" data-series="cost_by_team" data-x="team_name" data-y="total_cost_usd"></svg>
+      <table>
+        <thead><tr><th>Team</th><th>Requests</th><th>Cost</th><th>Budget Used</th></tr></thead>
+        <tbody>
+          {% for team in data.cost_by_team %}
+          <tr>
+            <td class="text">{{ team.team_name }}</td>
+            <td>{{ team.request_count }}</td>
+            <td>${{ "%.4f"|format(team.total_cost_usd) }}</td>
+            <td>{% if team.budget_pct is not none %}{{ "%.1f"|format(team.budget_pct) }}%{% else %}no budget set{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state">No team activity in the last 24 hours yet.</div>
+      {% endif %}
+    </section>
+    <section class="block">
+      <h2>Estimated Cache Savings</h2>
+      <div class="tiles">
+        <div class="tile"><div class="label">Saved (est.)</div><div class="value">${{ "%.4f"|format(data.cache_savings_usd) }}</div></div>
+      </div>
+    </section>
+  </section>
+
+  <section class="panel" id="panel-performance" role="tabpanel" aria-labelledby="tab-performance" data-active="false">
+    <div class="tiles">
+      <div class="tile"><div class="label">p50 Latency</div><div class="value">{{ "%.0f"|format(data.performance.latency_p50_ms) }}ms</div></div>
+      <div class="tile"><div class="label">p95 Latency</div><div class="value">{{ "%.0f"|format(data.performance.latency_p95_ms) }}ms</div></div>
+      <div class="tile"><div class="label">p99 Latency</div><div class="value">{{ "%.0f"|format(data.performance.latency_p99_ms) }}ms</div></div>
+    </div>
+    <section class="block">
+      <h2>Latency by Provider</h2>
+      {% if data.performance.latency_by_provider %}
+      <svg class="chart" data-chart="bar" data-series="performance.latency_by_provider" data-x="provider" data-y="avg_ms"></svg>
+      {% else %}
+      <div class="empty-state">No requests in the last 24 hours yet.</div>
+      {% endif %}
+    </section>
+    <section class="block">
+      <h2>Fallback Rate Over Time</h2>
+      {% if data.performance.fallback_rate_hourly %}
+      <svg class="chart" data-chart="line" data-series="performance.fallback_rate_hourly" data-x="hour" data-y="rate"></svg>
+      {% else %}
+      <div class="empty-state">No requests in the last 24 hours yet.</div>
+      {% endif %}
+    </section>
+  </section>
+
+  <section class="panel" id="panel-safety" role="tabpanel" aria-labelledby="tab-safety" data-active="false">
+    <div class="tiles">
+      <div class="tile"><div class="label">Block Rate</div><div class="value {{ 'danger' if data.safety.block_rate > 0 else '' }}">{{ "%.1f"|format(data.safety.block_rate * 100) }}%</div></div>
+    </div>
+    <section class="block">
+      <h2>Guardrail Blocks Over Time</h2>
+      {% if data.safety.blocks_hourly %}
+      <svg class="chart" data-chart="line" data-series="safety.blocks_hourly" data-x="hour" data-y="count"></svg>
+      {% else %}
+      <div class="empty-state">No blocked requests in the last 24 hours.</div>
+      {% endif %}
+    </section>
+    <section class="block">
+      <h2>Blocks by Reason</h2>
+      {% if data.safety.blocks_by_reason %}
+      <svg class="chart" data-chart="bar" data-series="safety.blocks_by_reason" data-x="reason" data-y="count"></svg>
+      {% else %}
+      <div class="empty-state">No blocked requests in the last 24 hours.</div>
+      {% endif %}
+    </section>
+  </section>
+
+  <div class="chart-tooltip" id="chart-tooltip"></div>
+
   <script id="dashboard-data" type="application/json">{{ data_json | safe }}</script>
 </body>
 </html>
