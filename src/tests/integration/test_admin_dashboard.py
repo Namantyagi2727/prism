@@ -1,4 +1,5 @@
 import base64
+import uuid
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -111,9 +112,21 @@ async def test_dashboard_includes_tab_and_chart_script() -> None:
         )
         api_key = key_resp.json()["key"]
 
+        # A shared, session-scoped Redis backs the exact cache, so a generic
+        # "hi" here could get cache-served to (or collide with) an unrelated
+        # test's request. Get uniqueness from `temperature` instead of the
+        # message content — content goes through the guardrail's PII/NER
+        # scan, and a random token embedded in short text has a real (not
+        # astronomically small) chance of a false-positive PII match, which
+        # made this exact pattern flaky elsewhere in the suite.
+        unique_temperature = (uuid.uuid4().int % 1_000_000) / 1_000_000
         await client.post(
             "/v1/chat/completions",
-            json={"model": "fast", "messages": [{"role": "user", "content": "hi"}]},
+            json={
+                "model": "fast",
+                "messages": [{"role": "user", "content": "Say hi"}],
+                "temperature": unique_temperature,
+            },
             headers={"Authorization": f"Bearer {api_key}"},
         )
 

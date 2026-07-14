@@ -79,13 +79,16 @@ async def test_guardrail_block_increments_counter(api_key: str) -> None:
 async def test_cache_miss_then_hit_records_metrics(api_key: str) -> None:
     from prometheus_client import REGISTRY
 
-    unique_id = uuid.uuid4().hex
+    # Uniqueness comes from `temperature`, not message content: a random
+    # token embedded in short scanned text has a real chance of tripping
+    # the guardrail's PII/NER false-positive rate (confirmed empirically —
+    # ~3.7% of uuid4().hex values got flagged as PERSON/MEDICAL_LICENSE),
+    # which made this test intermittently fail with a 400 instead of 200.
+    unique_temperature = (uuid.uuid4().int % 1_000_000) / 1_000_000
     payload = {
         "model": "fast",
-        "messages": [
-            {"role": "user", "content": f"What is 7 times 8? run={unique_id}"}
-        ],
-        "temperature": 0.0,
+        "messages": [{"role": "user", "content": "What is 7 times 8?"}],
+        "temperature": unique_temperature,
     }
     headers = {"Authorization": f"Bearer {api_key}"}
 
