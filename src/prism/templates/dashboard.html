@@ -99,10 +99,22 @@
       text-align: center;
       border: 1px dashed var(--border);
     }
-    .chart { width: 100%; height: 160px; overflow: visible; }
+    .chart { width: 100%; height: 200px; overflow: visible; }
     .chart-point { fill: var(--accent); cursor: pointer; }
     .chart-bar { fill: var(--accent); cursor: pointer; }
     .chart-line { fill: none; stroke: var(--accent); stroke-width: 2; }
+    .chart-value-label {
+      fill: var(--text);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-anchor: middle;
+    }
+    .chart-axis-label {
+      fill: var(--text-muted);
+      font-family: var(--font-sans);
+      font-size: 10px;
+      text-anchor: middle;
+    }
     .chart-tooltip {
       position: absolute;
       background: var(--panel);
@@ -132,14 +144,14 @@
   <section class="panel" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" data-active="true">
     <div class="tiles">
       <div class="tile"><div class="label">Total Requests</div><div class="value">{{ data.overview.total_requests }}</div></div>
-      <div class="tile"><div class="label">Total Cost</div><div class="value">${{ "%.4f"|format(data.overview.total_cost_usd) }}</div></div>
+      <div class="tile"><div class="label">Total Cost</div><div class="value">${{ "%.6f"|format(data.overview.total_cost_usd) }}</div></div>
       <div class="tile"><div class="label">Cache Hit Rate</div><div class="value">{{ "%.1f"|format(data.overview.cache_hit_rate * 100) }}%</div></div>
       <div class="tile"><div class="label">Error Rate</div><div class="value {{ 'danger' if data.overview.error_rate > 0 else '' }}">{{ "%.1f"|format(data.overview.error_rate * 100) }}%</div></div>
     </div>
     <section class="block">
       <h2>Request Volume</h2>
       {% if data.overview.hourly_volume %}
-      <svg class="chart" data-chart="line" data-series="overview.hourly_volume" data-x="hour" data-y="count"></svg>
+      <svg class="chart" data-chart="line" data-series="overview.hourly_volume" data-x="hour" data-y="count" data-x-format="hour" data-y-format="count"></svg>
       {% else %}
       <div class="empty-state">No requests in the last 24 hours yet.</div>
       {% endif %}
@@ -147,7 +159,7 @@
     <section class="block">
       <h2>Provider Mix</h2>
       {% if data.overview.provider_mix %}
-      <svg class="chart" data-chart="bar" data-series="overview.provider_mix" data-x="provider" data-y="count"></svg>
+      <svg class="chart" data-chart="bar" data-series="overview.provider_mix" data-x="provider" data-y="count" data-y-format="count"></svg>
       {% else %}
       <div class="empty-state">No requests in the last 24 hours yet.</div>
       {% endif %}
@@ -158,7 +170,7 @@
     <section class="block">
       <h2>Cost by Team</h2>
       {% if data.cost_by_team %}
-      <svg class="chart" data-chart="bar" data-series="cost_by_team" data-x="team_name" data-y="total_cost_usd"></svg>
+      <svg class="chart" data-chart="bar" data-series="cost_by_team" data-x="team_name" data-y="total_cost_usd" data-y-format="currency"></svg>
       <table>
         <thead><tr><th>Team</th><th>Requests</th><th>Cost</th><th>Budget Used</th></tr></thead>
         <tbody>
@@ -166,7 +178,7 @@
           <tr>
             <td class="text">{{ team.team_name }}</td>
             <td>{{ team.request_count }}</td>
-            <td>${{ "%.4f"|format(team.total_cost_usd) }}</td>
+            <td>${{ "%.6f"|format(team.total_cost_usd) }}</td>
             <td>{% if team.budget_pct is not none %}{{ "%.1f"|format(team.budget_pct) }}%{% else %}no budget set{% endif %}</td>
           </tr>
           {% endfor %}
@@ -179,7 +191,7 @@
     <section class="block">
       <h2>Estimated Cache Savings</h2>
       <div class="tiles">
-        <div class="tile"><div class="label">Saved (est.)</div><div class="value">${{ "%.4f"|format(data.cache_savings_usd) }}</div></div>
+        <div class="tile"><div class="label">Saved (est.)</div><div class="value">${{ "%.6f"|format(data.cache_savings_usd) }}</div></div>
       </div>
     </section>
   </section>
@@ -193,7 +205,7 @@
     <section class="block">
       <h2>Latency by Provider</h2>
       {% if data.performance.latency_by_provider %}
-      <svg class="chart" data-chart="bar" data-series="performance.latency_by_provider" data-x="provider" data-y="avg_ms"></svg>
+      <svg class="chart" data-chart="bar" data-series="performance.latency_by_provider" data-x="provider" data-y="avg_ms" data-y-format="ms"></svg>
       {% else %}
       <div class="empty-state">No requests in the last 24 hours yet.</div>
       {% endif %}
@@ -201,7 +213,7 @@
     <section class="block">
       <h2>Fallback Rate Over Time</h2>
       {% if data.performance.fallback_rate_hourly %}
-      <svg class="chart" data-chart="line" data-series="performance.fallback_rate_hourly" data-x="hour" data-y="rate"></svg>
+      <svg class="chart" data-chart="line" data-series="performance.fallback_rate_hourly" data-x="hour" data-y="rate" data-x-format="hour" data-y-format="percent"></svg>
       {% else %}
       <div class="empty-state">No requests in the last 24 hours yet.</div>
       {% endif %}
@@ -215,7 +227,7 @@
     <section class="block">
       <h2>Guardrail Blocks Over Time</h2>
       {% if data.safety.blocks_hourly %}
-      <svg class="chart" data-chart="line" data-series="safety.blocks_hourly" data-x="hour" data-y="count"></svg>
+      <svg class="chart" data-chart="line" data-series="safety.blocks_hourly" data-x="hour" data-y="count" data-x-format="hour" data-y-format="count"></svg>
       {% else %}
       <div class="empty-state">No blocked requests in the last 24 hours.</div>
       {% endif %}
@@ -223,7 +235,7 @@
     <section class="block">
       <h2>Blocks by Reason</h2>
       {% if data.safety.blocks_by_reason %}
-      <svg class="chart" data-chart="bar" data-series="safety.blocks_by_reason" data-x="reason" data-y="count"></svg>
+      <svg class="chart" data-chart="bar" data-series="safety.blocks_by_reason" data-x="reason" data-y="count" data-y-format="count"></svg>
       {% else %}
       <div class="empty-state">No blocked requests in the last 24 hours.</div>
       {% endif %}
@@ -292,71 +304,115 @@
       }
 
       var SVG_NS = "http://www.w3.org/2000/svg";
+      var MIN_BAR_HEIGHT = 3;
+      var TOP_PAD = 24;
+      var BOTTOM_PAD = 34;
+      var SIDE_PAD = 8;
 
-      function renderLineChart(svg, points, xKey, yKey) {
+      function formatValue(value, format) {
+        if (format === "currency") return "$" + value.toFixed(6);
+        if (format === "ms") return Math.round(value) + "ms";
+        if (format === "percent") return (value * 100).toFixed(1) + "%";
+        return String(value);
+      }
+
+      function formatXLabel(value, format) {
+        if (format === "hour") {
+          var d = new Date(value);
+          return String(d.getHours()).padStart(2, "0") + ":00";
+        }
+        var text = String(value);
+        return text.length > 10 ? text.slice(0, 9) + "…" : text;
+      }
+
+      function addText(svg, x, y, text, cls) {
+        var el = document.createElementNS(SVG_NS, "text");
+        el.setAttribute("x", String(x));
+        el.setAttribute("y", String(y));
+        el.setAttribute("class", cls);
+        el.textContent = text;
+        svg.appendChild(el);
+        return el;
+      }
+
+      function renderLineChart(svg, points, xKey, yKey, yFormat, xFormat) {
         var width = svg.clientWidth || 600;
-        var height = 160;
-        var padding = 20;
+        var height = 200;
         svg.setAttribute("viewBox", "0 0 " + width + " " + height);
 
         var values = points.map(function (p) { return p[yKey]; });
         var maxY = Math.max.apply(null, values.concat([0.0001]));
-        var stepX = points.length > 1 ? (width - padding * 2) / (points.length - 1) : 0;
+        var plotWidth = width - SIDE_PAD * 2;
+        var plotHeight = height - TOP_PAD - BOTTOM_PAD;
+        var stepX = points.length > 1 ? plotWidth / (points.length - 1) : 0;
+        var singlePointX = SIDE_PAD + plotWidth / 2;
 
         var coords = points.map(function (p, i) {
-          var x = padding + i * stepX;
-          var y = height - padding - (p[yKey] / maxY) * (height - padding * 2);
+          var x = points.length > 1 ? SIDE_PAD + i * stepX : singlePointX;
+          var y = TOP_PAD + plotHeight - (p[yKey] / maxY) * plotHeight;
           return { x: x, y: y, label: p[xKey], value: p[yKey] };
         });
 
-        var pathD = coords
-          .map(function (c, i) { return (i === 0 ? "M" : "L") + c.x + "," + c.y; })
-          .join(" ");
-
-        var path = document.createElementNS(SVG_NS, "path");
-        path.setAttribute("d", pathD);
-        path.setAttribute("class", "chart-line");
-        svg.appendChild(path);
+        if (coords.length > 1) {
+          var pathD = coords
+            .map(function (c, i) { return (i === 0 ? "M" : "L") + c.x + "," + c.y; })
+            .join(" ");
+          var path = document.createElementNS(SVG_NS, "path");
+          path.setAttribute("d", pathD);
+          path.setAttribute("class", "chart-line");
+          svg.appendChild(path);
+        }
 
         coords.forEach(function (c) {
           var circle = document.createElementNS(SVG_NS, "circle");
           circle.setAttribute("cx", String(c.x));
           circle.setAttribute("cy", String(c.y));
-          circle.setAttribute("r", "3");
+          circle.setAttribute("r", "4");
           circle.setAttribute("class", "chart-point");
+          var tooltipText = formatXLabel(c.label, xFormat) + ": " + formatValue(c.value, yFormat);
           circle.addEventListener("mousemove", function (evt) {
-            showTooltip(evt, c.label + ": " + c.value);
+            showTooltip(evt, tooltipText);
           });
           circle.addEventListener("mouseleave", hideTooltip);
           svg.appendChild(circle);
+
+          addText(svg, c.x, Math.max(c.y - 10, 12), formatValue(c.value, yFormat), "chart-value-label");
+          addText(svg, c.x, height - 10, formatXLabel(c.label, xFormat), "chart-axis-label");
         });
       }
 
-      function renderBarChart(svg, points, xKey, yKey) {
+      function renderBarChart(svg, points, xKey, yKey, yFormat) {
         var width = svg.clientWidth || 600;
-        var height = 160;
-        var padding = 20;
+        var height = 200;
         svg.setAttribute("viewBox", "0 0 " + width + " " + height);
 
         var values = points.map(function (p) { return p[yKey]; });
         var maxY = Math.max.apply(null, values.concat([0.0001]));
-        var barWidth = (width - padding * 2) / points.length;
+        var plotWidth = width - SIDE_PAD * 2;
+        var plotHeight = height - TOP_PAD - BOTTOM_PAD;
+        var barWidth = plotWidth / points.length;
 
         points.forEach(function (p, i) {
-          var barHeight = (p[yKey] / maxY) * (height - padding * 2);
-          var x = padding + i * barWidth;
-          var y = height - padding - barHeight;
+          var barHeight = Math.max((p[yKey] / maxY) * plotHeight, MIN_BAR_HEIGHT);
+          var x = SIDE_PAD + i * barWidth;
+          var y = TOP_PAD + plotHeight - barHeight;
+          var centerX = x + barWidth / 2;
+
           var rect = document.createElementNS(SVG_NS, "rect");
           rect.setAttribute("x", String(x + barWidth * 0.1));
           rect.setAttribute("y", String(y));
           rect.setAttribute("width", String(barWidth * 0.8));
           rect.setAttribute("height", String(barHeight));
           rect.setAttribute("class", "chart-bar");
+          var tooltipText = p[xKey] + ": " + formatValue(p[yKey], yFormat);
           rect.addEventListener("mousemove", function (evt) {
-            showTooltip(evt, p[xKey] + ": " + p[yKey]);
+            showTooltip(evt, tooltipText);
           });
           rect.addEventListener("mouseleave", hideTooltip);
           svg.appendChild(rect);
+
+          addText(svg, centerX, Math.max(y - 8, 12), formatValue(p[yKey], yFormat), "chart-value-label");
+          addText(svg, centerX, height - 10, formatXLabel(p[xKey], "text"), "chart-axis-label");
         });
       }
 
@@ -365,10 +421,12 @@
         if (!series.length) return;
         var xKey = svg.dataset.x;
         var yKey = svg.dataset.y;
+        var yFormat = svg.dataset.yFormat;
+        var xFormat = svg.dataset.xFormat;
         if (svg.dataset.chart === "line") {
-          renderLineChart(svg, series, xKey, yKey);
+          renderLineChart(svg, series, xKey, yKey, yFormat, xFormat);
         } else {
-          renderBarChart(svg, series, xKey, yKey);
+          renderBarChart(svg, series, xKey, yKey, yFormat);
         }
       });
 

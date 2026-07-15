@@ -149,6 +149,69 @@ async def test_get_dashboard_data_empty_window_returns_zeroed_stats(
 
 
 @pytest.mark.integration
+async def test_latency_percentiles_exclude_cache_and_blocked_requests(
+    db: AsyncSession,
+) -> None:
+    # Cache hits and guardrail blocks never reach a provider, so their
+    # near-zero latency shouldn't pull the gateway-overhead percentiles
+    # down and make a real provider's latency look contradictory next to
+    # them. Only "ollama" here should count toward p50/p95.
+    anchor = datetime(2021, 1, 1, tzinfo=UTC)
+    since = anchor - timedelta(minutes=1)
+    until = anchor + timedelta(minutes=1)
+
+    team = Team(
+        name=f"latency-{uuid.uuid4().hex[:8]}", monthly_budget_usd=Decimal("50.00")
+    )
+    db.add(team)
+    await db.flush()
+    api_key = ApiKey(
+        team_id=team.id, key_hash=f"hash-{uuid.uuid4().hex}", key_prefix="prism_test"
+    )
+    db.add(api_key)
+    await db.flush()
+
+    db.add_all(
+        [
+            RequestLog(
+                api_key_id=api_key.id,
+                virtual_model="fast",
+                provider_used="ollama",
+                cache_hit=False,
+                latency_ms=1000,
+                status_code=200,
+                created_at=anchor,
+            ),
+            RequestLog(
+                api_key_id=api_key.id,
+                virtual_model="fast",
+                provider_used="cache",
+                cache_hit=True,
+                latency_ms=1,
+                status_code=200,
+                created_at=anchor,
+            ),
+            RequestLog(
+                api_key_id=api_key.id,
+                virtual_model="fast",
+                provider_used="cache",
+                cache_hit=True,
+                latency_ms=1,
+                status_code=200,
+                created_at=anchor,
+            ),
+        ]
+    )
+    await db.commit()
+
+    data = await get_dashboard_data(db, since=since, until=until)
+
+    # If the two 1ms cache hits were included, p50 of [1, 1, 1000] would be
+    # 1ms, not 1000ms.
+    assert data["performance"]["latency_p50_ms"] == pytest.approx(1000.0)
+
+
+@pytest.mark.integration
 async def test_get_dashboard_data_defaults_to_last_24h(db: AsyncSession) -> None:
     data = await get_dashboard_data(db)
     assert data["overview"]["total_requests"] >= 0

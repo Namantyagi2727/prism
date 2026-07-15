@@ -134,6 +134,10 @@ async def _get_cache_savings(
 async def _get_latency_percentiles(
     db: AsyncSession, since: datetime, until: datetime
 ) -> dict[str, object]:
+    # Scoped to requests that actually reached a provider — cache hits and
+    # guardrail blocks never call one, so pooling their near-zero latency
+    # in with real provider round-trips would understate p50/p95 and make
+    # the percentiles misleading rather than measuring gateway overhead.
     result = await db.execute(
         select(
             func.percentile_cont(0.5).within_group(RequestLog.latency_ms).label("p50"),
@@ -143,6 +147,7 @@ async def _get_latency_percentiles(
         .where(RequestLog.created_at >= since)
         .where(RequestLog.created_at < until)
         .where(RequestLog.latency_ms.is_not(None))
+        .where(RequestLog.provider_used.notin_(["cache", "blocked"]))
     )
     row = result.one()
     return {
