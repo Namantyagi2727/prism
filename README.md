@@ -90,6 +90,25 @@ trailing 24h, built with hand-rolled vanilla JS and inline SVG charts (no
 chart library, no build step) alongside the Grafana operational
 dashboards.
 
+## Screenshots
+
+<table>
+<tr>
+<td><img src="docs/screenshots/dashboard-overview.png" alt="Admin dashboard — Overview tab" width="420"></td>
+<td><img src="docs/screenshots/dashboard-cost.png" alt="Admin dashboard — Cost & Teams tab" width="420"></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/dashboard-performance.png" alt="Admin dashboard — Performance tab" width="420"></td>
+<td><img src="docs/screenshots/dashboard-safety.png" alt="Admin dashboard — Safety tab" width="420"></td>
+</tr>
+<tr>
+<td colspan="2"><img src="docs/screenshots/grafana.png" alt="Grafana operational dashboard" width="860"></td>
+</tr>
+</table>
+
+*Admin dashboard's four tabs, plus the Grafana operational dashboard from
+Phase 4.*
+
 ## Key design decisions
 
 | Decision | Choice made | Alternative | Why |
@@ -167,39 +186,3 @@ goals than a teardown-able cloud environment would have added.
   removing the dead code if it's not worth the embedding-call latency
   tradeoff) is a real, scoped follow-up, not an oversight discovered
   after the fact.
-
----
-
-## Resume & Interview Notes
-
-**Resume bullets** (kept honest to what's actually built — no Kubernetes
-or Terraform claims, since deployment was deliberately scoped to local):
-
-- Designed and built a multi-provider LLM gateway (FastAPI, Postgres,
-  Redis) implementing automatic failover with a hand-rolled circuit
-  breaker, exact-match caching, and prompt-injection/PII guardrails;
-  load-tested to ~250 req/s with 0% error rate and 0% error rate
-  maintained through a simulated full provider outage via the fallback
-  chain.
-- Built full observability (OpenTelemetry, Prometheus, Grafana, plus a
-  hand-rolled admin analytics dashboard) into the service, enabling
-  real-time cost, latency, and error-rate tracking per team; instrumented
-  CI/CD (GitHub Actions: lint → type-check → test via testcontainers →
-  Docker build → Trivy container scan) as a required merge gate.
-- Found and fixed a real concurrency bug via load testing — a per-request
-  Redis connection pattern that caused a 77% failure rate under load —
-  demonstrating the value of load testing beyond "does it work," to "does
-  it keep working under concurrency."
-
-**STAR interview narrative:**
-*Situation*: LLM usage at most companies is ungoverned — no cost
-visibility, no failover, no safety checks.
-*Task*: build a real gateway that addresses all four at once, scoped
-honestly rather than padded with unused infrastructure.
-*Action*: walk through the request lifecycle diagram above, the circuit
-breaker/fallback design, and one specific hard call — e.g., why a
-heuristic injection scorer over a fine-tuned classifier, or why the
-semantic cache got built but deliberately not wired in yet.
-*Result*: the real benchmark numbers above, and the two things I'd fix
-next if this went further: Redis failure-domain graceful degradation, and
-either wiring in or removing the dead semantic-cache code.
