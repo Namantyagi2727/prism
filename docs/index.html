@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prism — LLM Gateway &amp; Control Plane</title>
+<meta name="description" content="A production-shaped LLM gateway: multi-provider routing with automatic failover, PII/prompt-injection guardrails, exact caching, cost tracking, and full observability.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #EEF2FA;
+    --paper-deep: #DCE6F5;
+    --ink: #14213D;
+    --ink-muted: #4A5A7A;
+    --line: #B8C9E8;
+    --signal: #C46A1F;
+    --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+    --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0B1E3D;
+      --paper-deep: #122C54;
+      --ink: #F4F7FC;
+      --ink-muted: #9FB3D9;
+      --line: #2A4374;
+      --signal: #FF7A45;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #0B1E3D;
+    --paper-deep: #122C54;
+    --ink: #F4F7FC;
+    --ink-muted: #9FB3D9;
+    --line: #2A4374;
+    --signal: #FF7A45;
+  }
+
+  :root[data-theme="light"] {
+    --paper: #EEF2FA;
+    --paper-deep: #DCE6F5;
+    --ink: #14213D;
+    --ink-muted: #4A5A7A;
+    --line: #B8C9E8;
+    --signal: #C46A1F;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    line-height: 1.6;
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+
+  .wrap {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+  }
+
+  a { color: var(--signal); }
+
+  section.block {
+    border-top: 1px solid var(--line);
+    padding: 3rem 0;
+  }
+
+  section.block:first-of-type { border-top: none; }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-muted);
+    margin: 0 0 1rem;
+  }
+
+  h2 {
+    font-family: var(--font-mono);
+    font-size: 1.375rem;
+    font-weight: 600;
+    margin: 0 0 1.25rem;
+    text-wrap: balance;
+  }
+
+  p { max-width: 68ch; }
+
+  /* ---- theme toggle ---- */
+  .toggle-row {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    justify-content: flex-end;
+    padding: 1rem 1.5rem;
+    background: linear-gradient(var(--paper) 60%, transparent);
+  }
+
+  #theme-toggle {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    background: var(--paper-deep);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    padding: 0.5rem 0.875rem;
+    cursor: pointer;
+  }
+
+  #theme-toggle:hover { border-color: var(--signal); }
+  #theme-toggle:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+  /* ---- hero / title block ---- */
+  .hero { padding: 1rem 0 3.5rem; }
+
+  .hero h1 {
+    font-family: var(--font-mono);
+    font-size: clamp(2.5rem, 8vw, 4.5rem);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0 0 1rem;
+    line-height: 1;
+  }
+
+  .hero .pitch {
+    font-size: 1.125rem;
+    color: var(--ink-muted);
+    max-width: 56ch;
+    margin: 0 0 2rem;
+  }
+
+  .title-block {
+    border: 1px solid var(--line);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+
+  .title-block .field {
+    padding: 0.875rem 1rem;
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .title-block .field:last-child { border-right: none; }
+
+  .title-block .field .label {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-muted);
+    margin-bottom: 0.375rem;
+  }
+
+  .title-block .field .value {
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+  }
+
+  .cta-row {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1.75rem;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0.75rem 1.25rem;
+    text-decoration: none;
+    display: inline-block;
+  }
+
+  .btn-primary { background: var(--signal); color: #fff; }
+  .btn-secondary { border: 1px solid var(--line); color: var(--ink); }
+  .btn:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+  /* ---- plates (diagrams + screenshots) ---- */
+  .plate {
+    border: 1px solid var(--line);
+    background: #FBFCFE;
+    padding: 1.25rem;
+    margin: 1.5rem 0 0.5rem;
+    overflow-x: auto;
+  }
+
+  .plate img { display: block; width: 100%; height: auto; }
+  .plate .mermaid { display: flex; justify-content: center; }
+
+  .caption {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--ink-muted);
+    margin: 0 0 1.5rem;
+  }
+
+  .plate-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  @media (max-width: 640px) {
+    .plate-grid { grid-template-columns: 1fr; }
+  }
+
+  .plate-grid .plate { margin-top: 0; }
+
+  /* ---- stat callouts ---- */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    margin-bottom: 1.5rem;
+  }
+
+  .stat { background: var(--paper); padding: 1.25rem; }
+
+  .stat .num {
+    font-family: var(--font-mono);
+    font-size: 1.5rem;
+    color: var(--signal);
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+
+  .stat .desc { font-size: 0.8125rem; color: var(--ink-muted); }
+
+  .callout {
+    border-left: 3px solid var(--signal);
+    padding: 0.75rem 1rem;
+    background: var(--paper-deep);
+    font-size: 0.9375rem;
+  }
+
+  /* ---- decisions table ---- */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  th {
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-muted);
+    padding: 0.625rem 0.75rem;
+    border-bottom: 1px solid var(--line);
+  }
+
+  td {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+
+  /* ---- footer ---- */
+  footer {
+    border-top: 1px solid var(--line);
+    padding: 2.5rem 0 3rem;
+    font-size: 0.875rem;
+    color: var(--ink-muted);
+  }
+
+  footer .stack {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    margin: 0.75rem 0 1.5rem;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .hero { animation: rise 0.5s ease-out; }
+  }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+
+<div class="toggle-row">
+  <button id="theme-toggle" type="button" aria-label="Toggle light/dark theme">Toggle theme</button>
+</div>
+
+<div class="wrap">
+
+  <section class="hero">
+    <h1>PRISM</h1>
+    <p class="pitch">A production-shaped LLM gateway: multi-provider routing with automatic failover, PII/prompt-injection guardrails, exact caching, cost tracking, and full observability — built solo, benchmarked with real numbers.</p>
+
+    <div class="title-block">
+      <div class="field"><div class="label">System</div><div class="value">LLM Gateway &amp; Control Plane</div></div>
+      <div class="field"><div class="label">Stack</div><div class="value">FastAPI · Postgres · Redis</div></div>
+      <div class="field"><div class="label">Status</div><div class="value">Production-shaped, portfolio build</div></div>
+      <div class="field"><div class="label">Author</div><div class="value">Naman Tyagi</div></div>
+    </div>
+
+    <div class="cta-row">
+      <a class="btn btn-primary" href="https://github.com/Namantyagi2727/prism">View the repo</a>
+      <a class="btn btn-secondary" href="https://github.com/Namantyagi2727/prism#readme">Read the case study</a>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="eyebrow">The problem</div>
+    <h2>Ungoverned LLM access breaks the same five ways</h2>
+    <p>Every team that scales past "call OpenAI directly from the app" runs into the same five problems at once: unpredictable cost, no visibility into failures, security exposure (PII leakage, prompt injection), no resilience when a provider degrades, and no way to swap models without touching application code. Commercial products in this exact category — LiteLLM, Portkey, Helicone, Kong AI Gateway — are venture-funded because the problem is real. Prism is a real, working version of that same idea, with the tradeoffs made explicit rather than hidden.</p>
+  </section>
+
+  <section class="block">
+    <div class="eyebrow">Architecture</div>
+    <h2>Two views of the system</h2>
+    <p>Every call to <code>/v1/chat/completions</code> passes through the same pipeline. Two paths exit early — a guardrail block and an exact-cache hit — both skipping the provider call (and its cost) entirely.</p>
+
+    <div class="plate">
+      <pre class="mermaid">
+flowchart TD
+    Client(["Client (openai SDK, base_url=prism)"]) -->|"POST /v1/chat/completions"| Auth
+    Auth["Auth: hash key + Redis rate limit"] -->|invalid key| Reject401(["401 Unauthorized"])
+    Auth -->|over limit| Reject429(["429 Rate Limited"])
+    Auth -->|ok| Guardrail
+    Guardrail["Guardrail pre-check: PII + injection scan"] -->|flagged| Block(["400 Blocked"])
+    Guardrail -->|clean| CacheLookup
+    CacheLookup{"Exact cache hit?"}
+    CacheLookup -->|yes| CacheHit(["200: cache_hit=true, cost=$0"])
+    CacheLookup -->|no| Router
+    Router["Router: fallback chain + circuit breaker"] --> Provider
+    Provider["Provider call: Ollama / OpenAI-mock / Anthropic-mock"]
+    Provider -->|success| CostLog
+    Provider -->|failure, try next| Router
+    Provider -->|all exhausted| Reject503(["503 All providers failed"])
+    CostLog["Cost calc + log request"] --> CacheWrite
+    CacheWrite["Cache write"] --> Response(["200 + prism_metadata"])
+      </pre>
+    </div>
+    <p class="caption">FIG. 1 — Request flow through the gateway pipeline</p>
+
+    <div class="plate">
+      <pre class="mermaid">
+graph LR
+    subgraph host["Host machine"]
+        Ollama["Ollama: llama3.2:3b"]
+    end
+    subgraph compose["docker-compose"]
+        App["app: FastAPI / Prism"]
+        Postgres[("postgres + pgvector")]
+        Redis[("redis")]
+        Jaeger["jaeger: trace UI"]
+        Prometheus["prometheus: metrics scrape"]
+        Grafana["grafana: dashboards"]
+    end
+    App -->|SQL| Postgres
+    App -->|cache + rate limit| Redis
+    App -->|OTLP spans| Jaeger
+    App -.->|chat + embeddings| Ollama
+    Prometheus -->|scrape| App
+    Grafana -->|query| Prometheus
+      </pre>
+    </div>
+    <p class="caption">FIG. 2 — Infrastructure topology (Ollama runs on the host, not containerized)</p>
+  </section>
+
+  <section class="block">
+    <div class="eyebrow">In practice</div>
+    <h2>The admin dashboard and observability stack</h2>
+    <p>A four-tab admin dashboard (<code>/admin/dashboard</code>) — Overview, Cost &amp; Teams, Performance, Safety — built with hand-rolled vanilla JS and inline SVG charts, no chart library, no build step. Alongside it, a Grafana operational dashboard fed by Prometheus and OpenTelemetry.</p>
+
+    <div class="plate-grid">
+      <div>
+        <div class="plate"><img src="screenshots/dashboard-overview.png" alt="Admin dashboard, Overview tab: total requests, cost, cache hit rate, error rate, request volume chart, provider mix chart"></div>
+        <p class="caption">FIG. 3 — Overview</p>
+      </div>
+      <div>
+        <div class="plate"><img src="screenshots/dashboard-cost.png" alt="Admin dashboard, Cost and Teams tab: cost by team bar chart and table, estimated cache savings"></div>
+        <p class="caption">FIG. 4 — Cost &amp; Teams</p>
+      </div>
+      <div>
+        <div class="plate"><img src="screenshots/dashboard-performance.png" alt="Admin dashboard, Performance tab: p50/p95/p99 latency, latency by provider, fallback rate over time"></div>
+        <p class="caption">FIG. 5 — Performance</p>
+      </div>
+      <div>
+        <div class="plate"><img src="screenshots/dashboard-safety.png" alt="Admin dashboard, Safety tab: block rate, guardrail blocks over time, blocks by reason"></div>
+        <p class="caption">FIG. 6 — Safety</p>
+      </div>
+    </div>
+
+    <div class="plate"><img src="screenshots/grafana.png" alt="Grafana operational dashboard showing request rate, latency, cache hit rate, cost per minute, guardrail blocks, and circuit breaker state"></div>
+    <p class="caption">FIG. 7 — Grafana operational dashboard</p>
+  </section>
+
+  <section class="block">
+    <div class="eyebrow">Real numbers</div>
+    <h2>Load-tested, not estimated</h2>
+    <p>From a Locust load test (<code>src/tests/load/</code>) — see the repo for the exact run procedure. Machine: M4 Pro, single <code>uvicorn</code> process, no distributed workers.</p>
+
+    <div class="stats">
+      <div class="stat"><span class="num">~250 req/s</span><span class="desc">combined throughput, 0% unintended error rate</span></div>
+      <div class="stat"><span class="num">p50 ~130ms</span><span class="desc">gateway overhead at 50 concurrent users (isolated from provider latency)</span></div>
+      <div class="stat"><span class="num">~20%</span><span class="desc">cache hit rate, real $ saved per run</span></div>
+      <div class="stat"><span class="num">0.00%</span><span class="desc">error rate with Ollama fully down — fallback chain absorbed it</span></div>
+    </div>
+
+    <p>Real Ollama inference averaged 595ms (p95 1134ms) vs. the mock providers' 12.6ms and the exact cache's 7.9ms — the actual gateway-overhead-vs-provider-latency isolation these numbers are built to show.</p>
+
+    <div class="callout">One real bug this load test found and fixed: the rate limiter and exact cache each opened a new Redis connection per request instead of reusing a shared pool. At ~300 req/s that produced a 77% error rate under load — fixed with one shared client, mirroring the pattern the Postgres engine already used correctly.</div>
+  </section>
+
+  <section class="block">
+    <div class="eyebrow">Key design decisions</div>
+    <h2>Tradeoffs made explicit, not hidden</h2>
+    <table>
+      <thead>
+        <tr><th>Decision</th><th>Choice</th><th>Why</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Deployment</td>
+          <td>Docker Compose, local only</td>
+          <td>Cloud (EKS/Terraform) deliberately scoped out — fast local loop mattered more for this project's goals than a teardown-able cloud environment would have added.</td>
+        </tr>
+        <tr>
+          <td>Self-hosted model</td>
+          <td>Ollama, not vLLM</td>
+          <td>No GPU needed; runs via Metal on Apple Silicon with an OpenAI-compatible API out of the box.</td>
+        </tr>
+        <tr>
+          <td>Vector store</td>
+          <td>pgvector, not wired in</td>
+          <td>Semantic cache is implemented but not called from the live request path — only exact-match caching is live today, stated plainly rather than discovered later.</td>
+        </tr>
+        <tr>
+          <td>Circuit breaker</td>
+          <td>Hand-rolled state machine</td>
+          <td>Built from scratch deliberately to demonstrate understanding of the pattern, not just import it. Standard libraries everywhere else.</td>
+        </tr>
+        <tr>
+          <td>Injection detection</td>
+          <td>Regex/heuristic scorer</td>
+          <td>Honest about its limits, fast, no added inference cost. Named "v1" with a clear upgrade path.</td>
+        </tr>
+        <tr>
+          <td>Admin UI</td>
+          <td>Hand-rolled dashboard, not Streamlit</td>
+          <td>Four tabs, real aggregation queries, hand-rolled SVG charts — doubles as a demonstration of frontend fundamentals without a framework or build step.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>
+    <div class="eyebrow">Built with</div>
+    <div class="stack">FastAPI · SQLAlchemy · Postgres + pgvector · Redis · Presidio · OpenTelemetry · Prometheus · Grafana · Docker Compose · GitHub Actions · Locust</div>
+    <p>MIT licensed. <a href="https://github.com/Namantyagi2727/prism">github.com/Namantyagi2727/prism</a></p>
+  </footer>
+
+</div>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: "base",
+    themeVariables: {
+      primaryColor: "#DCE6F5",
+      primaryTextColor: "#14213D",
+      primaryBorderColor: "#B8C9E8",
+      lineColor: "#4A5A7A",
+      secondaryColor: "#EEF2FA",
+      tertiaryColor: "#EEF2FA",
+      fontFamily: "IBM Plex Mono, monospace",
+      fontSize: "13px"
+    }
+  });
+</script>
+
+<script>
+  (function () {
+    "use strict";
+    var root = document.documentElement;
+    var toggle = document.getElementById("theme-toggle");
+    var stored = localStorage.getItem("prism-theme");
+    if (stored) root.setAttribute("data-theme", stored);
+
+    toggle.addEventListener("click", function () {
+      var current = root.getAttribute("data-theme");
+      var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      var effectiveCurrent = current || (prefersDark ? "dark" : "light");
+      var next = effectiveCurrent === "dark" ? "light" : "dark";
+      root.setAttribute("data-theme", next);
+      localStorage.setItem("prism-theme", next);
+    });
+  })();
+</script>
+
+</body>
+</html>
