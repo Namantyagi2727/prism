@@ -1,13 +1,12 @@
 import time
 import uuid
 
-import redis.asyncio as aioredis
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from prism.config import settings
+from prism.core.redis_client import redis_client
 from prism.core.security import hash_key
 from prism.db.models import ApiKey
 from prism.db.session import get_db
@@ -21,15 +20,11 @@ def check_rate_limit_key(api_key_id: str, limit_rpm: int) -> str:
 
 
 async def _check_rate_limit(api_key_id: uuid.UUID, limit_rpm: int) -> bool:
-    r = aioredis.from_url(settings.redis_url, decode_responses=True)
     key = f"rl:{api_key_id}:{int(time.time() // 60)}"
-    try:
-        count = await r.incr(key)
-        if count == 1:
-            await r.expire(key, 60)
-        return int(count) <= limit_rpm
-    finally:
-        await r.aclose()
+    count = await redis_client.incr(key)
+    if count == 1:
+        await redis_client.expire(key, 60)
+    return int(count) <= limit_rpm
 
 
 async def validate_api_key(

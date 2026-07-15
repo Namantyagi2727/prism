@@ -10,6 +10,7 @@ from prism.api.chat import router as chat_router
 from prism.api.dashboard import router as dashboard_router
 from prism.api.health import router as health_router
 from prism.config import settings
+from prism.core.redis_client import redis_client
 from prism.db.session import engine
 from prism.observability.tracing import setup_tracing
 
@@ -19,6 +20,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     setup_tracing(settings.otel_endpoint)
     yield
     await engine.dispose()
+    await redis_client.aclose()
 
 
 app = FastAPI(title="Prism LLM Gateway", version="0.4.0", lifespan=lifespan)
